@@ -1,7 +1,12 @@
 #include <stdio.h>
 #include <string.h>
-#define CMD_SIZE 128
-#define DELIM "\n\t "
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#define DELIM "\r\n\t "
+#define RED "\033[0;31m"
+#define RESET "\e[0m"
 /*shell needs
 read line done
 stor line done 
@@ -16,32 +21,127 @@ jmp read line
 */
 
 
-void read_cmd(char *dst){
-	if(strlen(dst) > CMD_SIZE){
-		printf("command exeeded buffer\n");
-		return; 
-	}	
-	fflush(stdin);
-	fgets(dst,CMD_SIZE,stdin);    
+char* read_cmd(){
+	int buffer_size = 1024;
+	int position = 0;
+	char *buffer = malloc(sizeof(char) * buffer_size);
+	int c;
+
+	if(!buffer){
+	fprintf(stderr, "%sshell: Allocation error%s\n", RED, RESET);
+    exit(EXIT_FAILURE);
+	}
+
+	while(1){
+		c = getchar();
+
+		if(c == '\n' && position == 0){
+			printf("$ ");
+			fflush(stdin);
+			continue;		
+		}
+
+		if(c == EOF || c == '\n'){
+			buffer[position] = '\0';
+			return buffer;
+		}
+		else{
+			buffer[position] = c;
+		}
+		position++;
+
+		if(position >= buffer_size){
+			buffer_size += 1024;
+			buffer = realloc(buffer,buffer_size);
+			
+			if(!buffer){
+			fprintf(stderr, "%sshell: reAllocation error%s\n", RED, RESET);
+			exit(EXIT_FAILURE);	
+			}
+		}	
+	}
 }
 
-void cmdtok(char *src){
-	char *token = strtok(src,DELIM);
-	printf("the first token is : %s\n",token);		
-	token = strtok(token,DELIM);
-	printf("the first token is : %s\n",token);		
-	
-	 
+
+
+char **tok_cmd(char *cmd){
+	int token_size = 64;
+	int pos = 0;
+
+	char **tokens = malloc(token_size * sizeof(char * ));
+	char *token;
+
+	if(!tokens){
+		fprintf(stderr, "%sshell: Allocation error <tokens>%s\n", RED, RESET);
+		exit(EXIT_FAILURE);		
+	}
+
+	token = strtok(cmd,DELIM);
+	while(token != NULL){
+		tokens[pos] = token;	
+		pos++;
+
+		if(pos >= token_size){
+			token_size += 1024;
+			tokens = realloc(tokens,token_size * sizeof(char *));
+
+			if(!tokens){
+				fprintf(stderr, "%sshell: reAllocation error <tokens>%s\n", RED, RESET);
+				exit(EXIT_FAILURE);			
+			}
+		}
+		
+
+		token = strtok(NULL,DELIM);
+	}
+	tokens[pos] = NULL;
+	return tokens;
 }
+
+int shell_exe(char **tokens){
+	pid_t cpid;
+	int status;
+
+	if(strcmp(tokens[0],"exit") == 0){	//what about the && command ? 
+		return 0;
+	}	
+	
+	cpid = fork();
+
+	if(cpid == 0){	//child process
+		if(execvp(tokens[0],tokens) < 0){
+			printf("%s: command not found.\n",tokens[0]);
+			exit(EXIT_FAILURE);
+		}
+	}
+	else if(cpid < 0){
+		printf(RED"error forking"RESET"\n");
+	}
+	else{
+	waitpid(cpid,&status,WUNTRACED);	
+	}
+	return 1;
+}
+
+void shell_loop(){
+	char *cmd;
+	char **args;
+	int status = 1; 
+
+	do{	
+		printf("$ ");
+			
+		cmd = read_cmd();
+		args = tok_cmd(cmd);
+		status = shell_exe(args);
+		free(cmd);
+		free(args);
+	}while(status == 1);
+}
+
+
 
 int main(void){
-    char cmd[128];
-    char **args; 
-	
-	printf("$ ");
-	read_cmd(cmd);   
-	//args = cmdtok(cmd); allocate space for the 2D array
-	cmdtok(cmd);
-	printf("the cmd is : %s\n",cmd);//stops at "\n"
+	shell_loop(); 
 	return 0;
 }
