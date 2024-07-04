@@ -6,6 +6,7 @@
 #include <unistd.h>
 #define DELIM "\r\n\t "
 #define RED "\033[0;31m"
+#define YELLOW "\x1b[33m"
 #define RESET "\e[0m"
 /*shell needs
 read line done
@@ -90,8 +91,6 @@ char **tok_cmd(char *cmd){
 				exit(EXIT_FAILURE);			
 			}
 		}
-		
-
 		token = strtok(NULL,DELIM);
 	}
 	tokens[pos] = NULL;
@@ -104,6 +103,10 @@ int shell_exe(char **tokens){
 
 	if(strcmp(tokens[0],"exit") == 0){	//what about the && command ? 
 		return 0;
+	}
+	if(strcmp(tokens[0],"cd") == 0){
+		chdir(tokens[1]);
+		return 1;
 	}	
 	
 	cpid = fork();
@@ -126,11 +129,16 @@ int shell_exe(char **tokens){
 void shell_loop(){
 	char *cmd;
 	char **args;
-	int status = 1; 
-
-	do{	
-		printf("$ ");
-			
+	int status = 1;
+	char* dir;
+	char* user;
+	do
+	{
+		user = getlogin();
+		dir = getcwd(NULL,0);
+		printf(YELLOW"%s:",user);
+		printf(RED"%s",dir);	
+		printf("$ ");	
 		cmd = read_cmd();
 		args = tok_cmd(cmd);
 		status = shell_exe(args);
@@ -138,8 +146,6 @@ void shell_loop(){
 		free(args);
 	}while(status == 1);
 }
-
-
 
 int main(void){
 	shell_loop(); 
