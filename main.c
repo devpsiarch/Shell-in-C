@@ -65,7 +65,7 @@ char* read_cmd(){
 
 
 
-char **tok_cmd(char *cmd){
+char **tok_cmd(char *delim,char *cmd){
 	int token_size = 64;
 	int pos = 0;
 
@@ -77,7 +77,7 @@ char **tok_cmd(char *cmd){
 		exit(EXIT_FAILURE);		
 	}
 
-	token = strtok(cmd,DELIM);
+	token = strtok(cmd,delim);
 	while(token != NULL){
 		tokens[pos] = token;	
 		pos++;
@@ -91,7 +91,7 @@ char **tok_cmd(char *cmd){
 				exit(EXIT_FAILURE);			
 			}
 		}
-		token = strtok(NULL,DELIM);
+		token = strtok(NULL,delim);
 	}
 	tokens[pos] = NULL;
 	return tokens;
@@ -126,24 +126,43 @@ int shell_exe(char **tokens){
 	return 1;
 }
 
+
+
+int execute_cmd(char* cmd){
+	char **args;
+	int output;
+	args = tok_cmd(DELIM,cmd);
+	output = shell_exe(args);
+	free(args);
+	return output;	
+}
+
 void shell_loop(){
 	char *cmd;
-	char **args;
 	int status = 1;
 	char* dir;
 	char* user;
+	char **diff;
+	int i;
 	do
 	{
+		i = 0;
 		user = getlogin();
 		dir = getcwd(NULL,0);
 		printf(YELLOW"%s:",user);
 		printf(RED"%s",dir);	
 		printf("$ ");	
 		cmd = read_cmd();
-		args = tok_cmd(cmd);
-		status = shell_exe(args);
+		diff = tok_cmd("&&",cmd);
+		while(diff[i] != NULL){
+			status = execute_cmd(diff[i]);
+			if(status != 1){
+				return; 
+			}
+			i++;
+		}
+		free(diff);
 		free(cmd);
-		free(args);
 	}while(status == 1);
 }
 
